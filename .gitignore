@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.Python
+build/
+dist/
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Betriebssystem
+.DS_Store
+Thumbs.db
+
+# Testausgaben (nicht ins Repo!)
+out/
+tmp/
+*.tmp
+
+# NIEMALS im Repo (Mandatsdaten oder echte Legenden)
+# Testdokumente in assets/ sind fiktiv und duerfen bleiben.
+# Echte Mandatsdokumente und echte Legenden gehoeren nicht hierher.
+*_KLAR.docx
+*_MANDAT_*.docx
+mandant_*
+klient_*
