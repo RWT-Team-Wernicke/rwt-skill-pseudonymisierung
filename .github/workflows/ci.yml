@@ -1,0 +1,62 @@
+name: Skript-Pruefung
+
+# Prueft bei jedem Push und Pull-Request, ob die Python-Skripte syntaktisch
+# korrekt sind, sich importieren lassen und ihre --help-Ausgabe erzeugen.
+# Ein voller Rundlauf-Test gegen die Testdaten in assets/ ergaenzt das
+# minimale Signal um einen echten Ende-zu-Ende-Test.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  pruefung:
+    name: Syntax, Import und Rundlauf
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Python 3.11 einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Abhaengigkeiten installieren
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r scripts/requirements.txt
+
+      - name: Syntaxpruefung aller Python-Dateien
+        run: python -m compileall -q scripts/
+
+      - name: --help pro Skript aufrufen (Import- und Argparse-Pruefung)
+        run: |
+          python scripts/pseudonymize.py --help
+          python scripts/depseudonymize.py --help
+          python scripts/check_residuals.py --help
+
+      - name: Rundlauf mit Beispieldaten
+        run: |
+          mkdir -p out
+          python scripts/pseudonymize.py \
+            --input assets/Testdokument_A_Sachverhaltsschreiben.docx \
+            --changemap assets/beispiel_changemap_TEST-A.json \
+            --alias TEST-A \
+            --outdir out/
+          python scripts/check_residuals.py \
+            --input out/Testdokument_A_Sachverhaltsschreiben_PSEUDO.docx
+          python scripts/depseudonymize.py \
+            --input out/Testdokument_A_Sachverhaltsschreiben_PSEUDO.docx \
+            --legend out/TEST-A_LEGENDE_v1.json \
+            --outdir out/
+
+      - name: Ausgaben pruefen
+        run: |
+          test -f out/Testdokument_A_Sachverhaltsschreiben_PSEUDO.docx
+          test -f out/TEST-A_LEGENDE_v1.md
+          test -f out/TEST-A_LEGENDE_v1.json
+          test -f out/Testdokument_A_Sachverhaltsschreiben_KLAR.docx
+          echo "Alle erwarteten Ausgabedateien vorhanden."
