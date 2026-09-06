@@ -1,6 +1,8 @@
 # rwt-skill-pseudonymisierung
 
-Agent-Skill für die reversible Pseudonymisierung von Mandatsdokumenten (DOCX) in einer geschlossenen KI-Umgebung. Erzeugt ein PSEUDO-Dokument, das gefahrlos in offene KI-Umgebungen geladen werden darf, sowie eine getrennte Legende zur Rückumwandlung.
+Stand: Version 1.1 (2026-09-06)
+
+Agent-Skill für die reversible Pseudonymisierung von Mandatsdokumenten (DOCX) in einer geschlossenen KI-Umgebung. Erzeugt ein PSEUDO-Dokument, das gefahrlos in offene KI-Umgebungen geladen werden darf, sowie eine getrennte Legende zur Rückumwandlung. Ab v1.1 mit Legendenschema v2 (Positionsindex): wortgleicher Roundtrip erreichbar (Kriterium K5a).
 
 Interner Skill der RWT-Gruppe / Die TaxMaxen. Zielumgebung: Claract (OMM Solutions, Stuttgart) oder eine andere Umgebung mit Unterstützung für [Open Agent Skills](https://github.com/agentskills/agentskills).
 
@@ -27,9 +29,10 @@ rwt-skill-pseudonymisierung/
 │   └── check_residuals.py                Restsuche nach harten Identifikatoren
 ├── references/
 │   ├── kategorien-katalog.md             Die 13 Kategorien und Regeln
-│   ├── legendenschema.md                 Struktur von Legende und Änderungskarte
+│   ├── legendenschema.md                 Struktur von Legende (Schema v2) und Änderungskarte
 │   ├── regex-muster.md                   Muster der Restsuche
-│   └── bedienanleitung.md                Anwenderhandbuch
+│   ├── bedienanleitung.md                Anwenderhandbuch
+│   └── roundtrip-grenzen.md              Positionsindex, K5a-Herleitung, Grenzen
 └── assets/
     ├── Testdokument_A_Sachverhaltsschreiben.docx
     ├── 260828_Schulung_Mailverlauf_Nordmark.pdf

@@ -1,5 +1,6 @@
 ---
 name: pseudonymisierung-mandatsdokumente
+version: 1.1
 description: |
   Reversible Pseudonymisierung von Kanzleidokumenten im DOCX-Format
   für die Weiterverarbeitung in offenen KI-Umgebungen. Erkennt Personen,
@@ -92,9 +93,10 @@ RUECKUMWANDELN
 Alias: MANDAT-XY
 ```
 
-1. Rufen Sie `scripts/depseudonymize.py` mit beiden Dateien auf. Das Skript ersetzt jeden Code durch die Grundform aus der Legende, deterministisch und ohne Umformulierung.
-2. Geben Sie aus: `<Name>_KLAR.docx` und einen kurzen Rückumwandlungsbericht mit: Anzahl je Code ersetzter Vorkommen, Codes ohne Legendeneintrag (sollte leer sein), Codes in der Legende ohne Vorkommen im Dokument (informativ).
+1. Rufen Sie `scripts/depseudonymize.py` mit beiden Dateien auf. Das Skript ersetzt jeden Code deterministisch und ohne Umformulierung. Ab Legendenschema v2 (Skill v1.1) wird jedes Vorkommen positions- und wortgetreu mit der im Original an dieser Stelle verwendeten `originalform` ersetzt. Bei einer alten Legende Schema v1 (Skill v1.0) wird auf die `grundform` zurückgegriffen; der Bericht weist dann darauf hin, dass ein wortgleicher Roundtrip nicht garantiert ist.
+2. Geben Sie aus: `<Name>_KLAR.docx` und einen kurzen Rückumwandlungsbericht mit: Anzahl je Code ersetzter Vorkommen, Codes ohne Legendeneintrag (sollte leer sein), Codes in der Legende ohne Vorkommen im Dokument (informativ), Legendenschema (v1 oder v2), Zahl der Grundform-Fallbacks (bei v2 muss 0 sein), Konsistenz des Positionscursors.
 3. Ergänzen Sie keine erklärenden Zusätze im Text. Die Kennzeichnungszeile aus Phase 2 wird beim Rückumwandeln entfernt.
+4. Ab Skill v1.1 ist Kriterium K5a (Inhaltstreue Roundtrip, harte Grenze: 5 abweichende Absätze; Ziel 0) das Freigabekriterium. Weichen Absätze nach der Rückumwandlung ab, ist entweder die Legende v1 (kein Positionsindex), die Ersetzungsreihenfolge im Ursprungsdokument mehrdeutig, oder das PSEUDO-Dokument wurde manuell nachbearbeitet.
 
 ## Ablauf PRUEFEN
 
@@ -155,6 +157,7 @@ Vor Auslieferung eines PSEUDO-Dokuments prüfen:
 - `references/legendenschema.md` — Aufbau der Legende (Kopf, Markdown-Tabelle, JSON-Block)
 - `references/regex-muster.md` — die harten Muster, die `check_residuals.py` nutzt
 - `references/bedienanleitung.md` — Schrittfolge für Anwender, Fehlerbilder, Ausschluss
+- `references/roundtrip-grenzen.md` — Herleitung des Positionsindex und Grenzen des wortgleichen Roundtrips (v1.1)
 - `assets/Testdokument_A_Sachverhaltsschreiben.docx` — fiktives Kanzleischreiben mit 31 Entitäten, 7 Fallen; für Testläufe
 - `assets/loesungsschluessel_A.md` — Soll-Liste zum Vergleich; **nie in den Bot laden**, nur beim Tester
 - `assets/bewertungsbogen.md` — Kriterien K1 bis K10 mit K.o.-Regeln
