@@ -63,7 +63,8 @@ _____________________________________________________________________
 - K1 oder K2 wiederholt verfehlt: Der Bot liest nicht das ganze Dokument oder verliert Aufmerksamkeit in Zitatblöcken und Kopfzeilen. Abhilfe: Dokument teilen, stärkeres Modell, oder im Systemprompt die Regel 6 um ein konkretes Beispiel aus dem Fehlerfall ergänzen. Bleibt es dabei, ist ein LLM-Bot für diese Aufgabe allein nicht ausreichend; dann wäre ein deterministischer Vorfilter (Regex für Nummernmuster, Adressen, E-Mails) auf Anbieterseite nötig.
 - K3 wiederholt verfehlt: Bot ist übervorsichtig bei Fundstellen. Abhilfe: Beispiele im Abschnitt KATEGORIEN, Spalte „Bleibt stehen", erweitern.
 - K4 verfehlt: Namensfallen. Abhilfe: Phase 1 ernst nehmen, Zweifelsfälle als Pflichtausgabe betonen.
-- K5 verfehlt: Der Bot „verbessert" Text. Abhilfe: Regel 1 im Prompt an den Anfang der Ausführungsanweisung wiederholen; bei anhaltendem Problem mechanischer Rückweg (Word Suchen-Ersetzen) als Standard.
+- K5a verfehlt bei Skill v1.1 (Legende Schema v2): Positionsindex oder Cursor stimmen nicht. Mögliche Ursachen: das PSEUDO-Dokument wurde nachträglich manuell geändert, die Legende gehört zu einer anderen Fassung, oder die Iterationsreihenfolge des Dokuments hat sich zwischen Pseudonymisierung und Rückumwandlung verändert. Bei Skill v1.0 (Schema v1) ist K5a strukturell nur zufällig erreichbar; dann Legende neu erzeugen.
+- K5b verfehlt: Der Bot „verbessert" Text. Abhilfe: Regel 1 im Prompt an den Anfang der Ausführungsanweisung wiederholen; bei anhaltendem Problem mechanischer Rückweg (Word Suchen-Ersetzen) als Standard.
 - K8 verfehlt: Der Bot ignoriert die Phasen. Prüfen, ob Claract den Systemprompt kürzt oder ein Zeichenlimit hat.
 
 Alle Beobachtungen mit Datum und Modell festhalten. Sie sind die Grundlage für Version 1.1 des Systemprompts und für die Entscheidung, ob das Verfahren in die RWT-KI-Richtlinie aufgenommen wird.

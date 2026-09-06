@@ -2,6 +2,8 @@
 """
 depseudonymize.py — deterministische Rueckumwandlung eines PSEUDO-DOCX in Klartext.
 
+Skill-Version 1.1, unterstuetzt Legendenschema v1 (Grundform) und v2 (Positionsindex).
+
 Aufruf:
     python depseudonymize.py \
         --input Dokument_PSEUDO.docx \
@@ -11,11 +13,20 @@ Aufruf:
 Erzeugt:
     <name>_KLAR.docx   — DOCX mit rueckuebersetzten Codes
 
-Regeln:
-- Jeder Code der Form [KATEGORIE_NN] wird durch die Grundform aus der Legende ersetzt.
-- Codes ohne Legendeneintrag bleiben stehen und werden im Bericht als Fehler gemeldet.
+Regeln
+------
+- Jeder Code der Form [KATEGORIE_NN] wird ersetzt:
+  * Schema v2: durch die stellenbezogene 'originalform' aus der Legende
+    (positionsgetreu, Cursor je Code); wortgleicher Roundtrip moeglich.
+  * Schema v1: durch die 'grundform' aus der Legende; Bericht enthaelt
+    dann eine Warnung, dass wortgleicher Roundtrip nicht garantiert ist.
+- Codes ohne Legendeneintrag bleiben stehen und werden im Bericht als
+  Fehler gemeldet.
 - Die Kennzeichnungszeile aus Phase 2 wird entfernt.
 - Keine Umformulierungen, keine Zusaetze.
+- Iterationsreihenfolge des Dokuments (Absaetze, dann Tabellen; danach
+  Kopf-/Fusszeilen aller Sections) MUSS dieselbe sein wie in
+  pseudonymize.py, sonst laeuft der Cursor auseinander.
 """
 
 from __future__ import annotations
@@ -35,60 +46,81 @@ except ImportError:
     sys.exit(2)
 
 
-# Erkennungsmuster fuer Codes in eckigen Klammern
 CODE_PATTERN = re.compile(
-    r"\[(PERSON|FIRMA|BEHOERDE|ORT|ANSCHRIFT|KONTAKT|STNR|REGISTER|KONTO|AZ|GEBDAT|OBJEKT|SONSTIGES)_\d{2,3}\]"
+    r"\[(PERSON|FIRMA|BEHOERDE|ORT|ANSCHRIFT|KONTAKT|STNR|REGISTER|"
+    r"KONTO|AZ|GEBDAT|OBJEKT|SONSTIGES)_\d{2,3}\]"
 )
 
-# Erkennungsmuster fuer die Kennzeichnungszeile
 MARKER_PATTERN = re.compile(
-    r"^\[Pseudonymisiertes Dokument · Alias .+? · Legende v\d+ · Codes nicht aufl(ö|oe)sen\]$"
+    r"^\[Pseudonymisiertes Dokument · Alias .+? · "
+    r"Legende v\d+ · Codes nicht aufl(ö|oe)sen\]$"
 )
 
 
-def load_legend(path: Path) -> dict[str, str]:
-    """Lade die Legende, gib ein Mapping {code_ohne_klammern: grundform} zurueck."""
+def load_legend(path: Path) -> tuple[int, dict[str, dict]]:
+    """
+    Laedt die Legende und gibt (schema_version, eintrag_by_code) zurueck.
+    Fuer Schema v1 werden die Eintraege intern auf v2-aehnliche Form gebracht
+    (Feld 'vorkommen' bleibt dann leer, Fallback auf Grundform).
+    """
     with open(path, "r", encoding="utf-8") as fh:
         data = json.load(fh)
-    mapping: dict[str, str] = {}
+    schema_version = int(data.get("version", 1))
+    eintrag_by_code: dict[str, dict] = {}
     for eintrag in data.get("eintraege", []):
-        mapping[eintrag["code"]] = eintrag["grundform"]
-    return mapping
+        code = eintrag["code"]
+        e = {
+            "grundform": eintrag["grundform"],
+            "vorkommen": eintrag.get("vorkommen", []) if schema_version >= 2 else [],
+            "kategorie": eintrag.get("kategorie", ""),
+        }
+        eintrag_by_code[code] = e
+    return schema_version, eintrag_by_code
 
 
-def apply_reverse_to_text(text: str, legend: dict[str, str],
+def make_reverse_replacer(schema_version: int, eintrag_by_code: dict[str, dict],
+                          cursor: dict[str, int],
                           counter: dict[str, int],
-                          missing: set[str]) -> str:
-    """Ersetzt alle Codes durch Grundformen. Registriert Treffer und Fehlstellen."""
+                          missing: set[str],
+                          fallback_count: dict[str, int]):
+    """Baut die re-sub-Callback-Funktion mit gebundenen Statuscontainern."""
     def repl(match: re.Match) -> str:
-        code_full = match.group(0)  # z. B. "[PERSON_01]"
-        code_key = code_full[1:-1]  # "PERSON_01"
-        if code_key in legend:
-            counter[code_full] = counter.get(code_full, 0) + 1
-            return legend[code_key]
-        missing.add(code_full)
-        return code_full  # unveraendert lassen
+        code_full = match.group(0)     # z. B. "[PERSON_01]"
+        code_key = code_full[1:-1]     # "PERSON_01"
+        if code_key not in eintrag_by_code:
+            missing.add(code_full)
+            return code_full
+        eintrag = eintrag_by_code[code_key]
+        counter[code_full] = counter.get(code_full, 0) + 1
 
-    return CODE_PATTERN.sub(repl, text)
+        if schema_version >= 2 and eintrag["vorkommen"]:
+            pos = cursor.get(code_key, 1)
+            treffer = next(
+                (v for v in eintrag["vorkommen"] if v["position"] == pos),
+                None
+            )
+            cursor[code_key] = pos + 1
+            if treffer is None:
+                fallback_count[code_key] = fallback_count.get(code_key, 0) + 1
+                return eintrag["grundform"]
+            return treffer["originalform"]
+        # Schema v1: Grundform
+        return eintrag["grundform"]
+    return repl
 
 
-def process_paragraph(paragraph, legend: dict[str, str],
-                      counter: dict[str, int], missing: set[str]) -> bool:
+def process_paragraph(paragraph, repl_callback) -> bool:
     """
-    Bearbeitet einen Absatz. Gibt True zurueck, wenn der Absatz die Kennzeichnungszeile
-    war und geloescht werden soll.
+    Bearbeitet einen Absatz. Gibt True zurueck, wenn der Absatz die
+    Kennzeichnungszeile war und geloescht werden soll.
     """
     runs = paragraph.runs
     if not runs:
         return False
-
     text = "".join(run.text for run in runs)
-
-    # Kennzeichnungszeile erkennen
     if MARKER_PATTERN.match(text.strip()):
         return True
-
-    new_text = apply_reverse_to_text(text, legend, counter, missing)
+    new_text = CODE_PATTERN.sub(repl_callback, text)
     if new_text != text:
         runs[0].text = new_text
         for run in runs[1:]:
@@ -96,16 +128,20 @@ def process_paragraph(paragraph, legend: dict[str, str],
     return False
 
 
-def process_document(doc, legend: dict[str, str]) -> tuple[dict[str, int], set[str]]:
+def process_document(doc, schema_version: int, eintrag_by_code: dict[str, dict]):
     counter: dict[str, int] = {}
     missing: set[str] = set()
+    cursor: dict[str, int] = {c: 1 for c in eintrag_by_code}
+    fallback_count: dict[str, int] = {}
+    repl_callback = make_reverse_replacer(
+        schema_version, eintrag_by_code, cursor, counter, missing, fallback_count
+    )
 
-    # Marker-Absätze werden gesammelt und am Ende entfernt
     to_remove: list = []
 
     def walk_container(container):
         for paragraph in container.paragraphs:
-            if process_paragraph(paragraph, legend, counter, missing):
+            if process_paragraph(paragraph, repl_callback):
                 to_remove.append(paragraph)
         for table in container.tables:
             for row in table.rows:
@@ -113,7 +149,6 @@ def process_document(doc, legend: dict[str, str]) -> tuple[dict[str, int], set[s
                     walk_container(cell)
 
     walk_container(doc)
-
     for section in doc.sections:
         for hf in (section.header, section.footer,
                    section.first_page_header, section.first_page_footer,
@@ -121,17 +156,16 @@ def process_document(doc, legend: dict[str, str]) -> tuple[dict[str, int], set[s
             if hf is not None:
                 walk_container(hf)
 
-    # Marker-Absätze aus dem XML entfernen
     for paragraph in to_remove:
         el = paragraph._element
         el.getparent().remove(el)
 
-    return counter, missing
+    return counter, missing, cursor, fallback_count
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Deterministische Rueckumwandlung eines PSEUDO-DOCX."
+        description="Deterministische Rueckumwandlung eines PSEUDO-DOCX (Skill v1.1)."
     )
     parser.add_argument("--input", required=True, type=Path,
                         help="PSEUDO-DOCX (wird nicht veraendert)")
@@ -149,33 +183,64 @@ def main() -> int:
         return 2
     args.outdir.mkdir(parents=True, exist_ok=True)
 
-    legend = load_legend(args.legend)
+    schema_version, eintrag_by_code = load_legend(args.legend)
     doc = Document(str(args.input))
-    counter, missing = process_document(doc, legend)
+    counter, missing, cursor, fallback_count = process_document(
+        doc, schema_version, eintrag_by_code
+    )
 
-    # Ausgabename
     stem = args.input.stem
     if stem.endswith("_PSEUDO"):
-        klar_name = stem[:-len("_PSEUDO")] + "_KLAR.docx"
+        klar_name = stem[: -len("_PSEUDO")] + "_KLAR.docx"
     else:
         klar_name = stem + "_KLAR.docx"
     klar_path = args.outdir / klar_name
     doc.save(str(klar_path))
 
-    # Legendeneintraege ohne Vorkommen im Dokument (informativ)
-    unused = [f"[{code}]" for code in legend if f"[{code}]" not in counter]
+    unused = [
+        f"[{code}]"
+        for code in eintrag_by_code
+        if f"[{code}]" not in counter
+    ]
+
+    # Cursor-Konsistenzpruefung: Nach dem Lauf muss cursor[c] = len(vorkommen)+1 sein,
+    # sonst wurden nicht alle Vorkommen abgerufen. Fuer v1 ist das Feld leer.
+    cursor_konsistenz = {}
+    if schema_version >= 2:
+        for code, eintrag in eintrag_by_code.items():
+            n = len(eintrag["vorkommen"])
+            erwartet = n + 1
+            ist = cursor.get(code, 1)
+            if ist != erwartet:
+                cursor_konsistenz[code] = {"erwartet": erwartet, "ist": ist}
+
+    status = "OK"
+    if missing:
+        status = "WARNUNG: Codes ohne Legende gefunden"
+    elif fallback_count:
+        status = "WARNUNG: Positionsindex unvollstaendig, Fallback auf Grundform"
+    elif cursor_konsistenz:
+        status = "WARNUNG: Cursor-Konsistenz verletzt"
+    elif schema_version < 2:
+        status = "OK, aber Legendenschema v1: wortgleicher Roundtrip nicht garantiert"
 
     report = {
+        "skill_version": "1.1",
+        "legendenschema": schema_version,
         "eingabe": str(args.input),
         "legende": str(args.legend),
         "ausgabe_klar": str(klar_path),
         "ersetzte_codes": counter,
         "codes_ohne_legende": sorted(missing),
         "legendeneintraege_ohne_vorkommen": unused,
-        "status": "OK" if not missing else "WARNUNG: Codes ohne Legende gefunden",
+        "positionsindex_fallback_auf_grundform": fallback_count,
+        "cursor_konsistenz_verletzungen": cursor_konsistenz,
+        "status": status,
     }
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    return 0 if not missing else 1
+    if missing or cursor_konsistenz:
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
