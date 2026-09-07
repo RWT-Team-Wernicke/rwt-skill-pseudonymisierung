@@ -1,6 +1,6 @@
 # rwt-skill-pseudonymisierung
 
-Stand: Version 1.2 (2026-09-06)
+Stand: Version 1.2.1 (2026-09-07)
 
 Agent-Skill für die reversible Pseudonymisierung von Mandatsdokumenten (DOCX) in einer geschlossenen KI-Umgebung. Erzeugt ein PSEUDO-Dokument, das gefahrlos in offene KI-Umgebungen geladen werden darf, sowie eine getrennte Legende zur Rückumwandlung. Ab v1.1 mit Legendenschema v2 (Positionsindex): wortgleicher Roundtrip erreichbar (Kriterium K5a). Ab v1.2 erkennt der Skill eingebettete Grafiken und Objekte im DOCX und weist darauf hin, dass Text darin nicht codiert wird.
 

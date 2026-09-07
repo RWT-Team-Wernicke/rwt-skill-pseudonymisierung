@@ -508,7 +508,7 @@ def main() -> int:
         e["code"]: len(e["vorkommen"]) for e in legende["eintraege"]
     }
     report = {
-        "skill_version": "1.2",
+        "skill_version": "1.2.1",
         "legendenschema": LEGEND_SCHEMA_VERSION,
         "eingabe": str(args.input),
         "ausgabe_pseudo": str(pseudo_path),

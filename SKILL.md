@@ -1,6 +1,5 @@
 ---
 name: pseudonymisierung-mandatsdokumente
-version: 1.2
 description: |
   Reversible Pseudonymisierung von Kanzleidokumenten im DOCX-Format
   für die Weiterverarbeitung in offenen KI-Umgebungen. Erkennt Personen,
@@ -16,6 +15,8 @@ description: |
   rückumwandeln, Klarnamen zurückführen. Eingang und Ausgang sind DOCX.
   Andere Formate zuerst mit dem Skill rwt-skill-dokument-nach-docx in
   DOCX überführen.
+metadata:
+  version: "1.2.1"
 ---
 
 # Pseudonymisierungs-Skill für Mandatsdokumente
