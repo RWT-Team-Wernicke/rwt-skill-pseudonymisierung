@@ -7,6 +7,48 @@ Datumsangaben beziehen sich auf den Merge nach `main`.
 
 ---
 
+## v1.2.1 (2026-09-07)
+
+Behebung eines Importfehlers, keine fachliche Aenderung.
+
+### Problem
+
+Das YAML-Frontmatter der `SKILL.md` enthielt seit v1.1 ein Feld
+`version`. Die Agent-Skills-Spezifikation laesst im Frontmatter nur
+`name`, `description`, `license`, `compatibility`, `metadata` und
+`allowed-tools` zu. Ein nicht zugelassenes Feld fuehrt beim Packen oder
+Hochladen zu einem harten Fehler, nicht zum stillen Ignorieren
+(dokumentierte Meldung: "Unexpected key(s) in SKILL.md frontmatter").
+
+Indiz: v1.0 hatte das Feld nicht und liess sich importieren. v1.1 und
+v1.2 hatten es. Der Import von v1.2 schlug fehl.
+
+Nebenbefund: `1.2` wurde in YAML als Gleitkommazahl gelesen. Eine
+kuenftige Angabe `1.10` waere zu `1.1` zusammengefallen.
+
+### Aenderung
+
+- Feld `version` aus dem Frontmatter entfernt.
+- Versionsangabe nach `metadata.version` verschoben, als Text notiert.
+  `metadata` ist eine ausdruecklich zugelassene freie Schluessel-Wert-Map.
+- `skill_version` im Pruefbericht und Versionsstand in `README.md`
+  nachgezogen.
+
+### Kontrolle
+
+Frontmatter gegen die Spezifikation geprueft: keine unzulaessigen
+Felder, `name` 34 von 64 Zeichen, `description` 925 von 1024 Zeichen,
+`metadata` ist eine Map, Versionsangabe ist ein String.
+
+### Merksatz
+
+Versionspflege gehoert nicht ins Frontmatter. Der Kopf der `SKILL.md`
+dient der Auffindbarkeit durch das Modell, nicht der Konfigurationsver-
+waltung. Der Verlauf steht in dieser Datei, die Fassung in
+`metadata.version`.
+
+---
+
 ## v1.2 (2026-09-07)
 
 Commit `451582cc`, Pull Request #2.
