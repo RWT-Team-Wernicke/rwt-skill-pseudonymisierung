@@ -23,6 +23,16 @@ mit stellenbezogener `originalform` und codebezogener Position im
 PSEUDO-Dokument. Damit kann `depseudonymize.py` einen wortgleichen
 Roundtrip liefern, statt jede Fundstelle mit der Grundform zu ersetzen.
 
+Neu in v1.2
+-----------
+Das Skript erkennt eingebettete Grafiken im DOCX (Bilder, eingebettete
+Objekte) ueber den Zip-Container und meldet sie im Pruefbericht als
+`eingebettete_grafiken`. Text, der ausschliesslich innerhalb einer
+Grafik steht (z. B. Screenshot, gescannte Unterschrift, eingebettetes
+Bild mit Beschriftung), wird von der Ersetzung **nicht** erfasst, weil
+das Skript nur den DOCX-Fliesstext durchsucht. Siehe
+references/roundtrip-grenzen.md, Abschnitt "Eingebettete Grafiken".
+
 Die Aenderungskarte auf Eingabeseite bleibt v1-kompatibel:
     {
       "alias": "MANDAT-XY",
@@ -80,6 +90,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import zipfile
 from datetime import date
 from pathlib import Path
 
@@ -91,6 +102,16 @@ except ImportError:
         "Bitte 'pip install -r requirements.txt' ausfuehren.\n"
     )
     sys.exit(2)
+
+
+# Bildformate, die in word/media/ auftreten koennen. Nicht abschliessend,
+# deckt aber die in der Praxis relevanten Faelle ab (Fotos, Screenshots,
+# eingebettete Vektorgrafiken, eingebettete Office-Objekte).
+BILDDATEI_ENDUNGEN = {
+    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tif", ".tiff",
+    ".emf", ".wmf", ".svg",
+}
+OBJEKTDATEI_ENDUNGEN = {".bin", ".xlsx", ".docx", ".pptx", ".pdf"}
 
 
 CATEGORIES_ALLOWED = {
@@ -268,6 +289,51 @@ def replace_in_document(doc, suchliste) -> tuple[dict[str, int], dict[str, list[
     return cursor, vorkommen_by_code
 
 
+def detect_embedded_media(input_path: Path) -> dict:
+    """
+    Erkennt eingebettete Grafiken und Objekte im DOCX ueber den
+    Zip-Container, unabhaengig von python-docx.
+
+    Ein DOCX ist ein Zip-Archiv. Eingebettete Bilder liegen konventionell
+    unter 'word/media/', eingebettete Objekte (z. B. eine eingebettete
+    Excel-Tabelle oder ein OLE-Objekt) unter 'word/embeddings/'. Text
+    innerhalb dieser Dateien (z. B. Text in einem Screenshot oder in
+    einer eingebetteten Tabelle als Bild) wird von der Zeichenketten-
+    ersetzung in replace_in_document() NICHT erfasst, weil diese nur
+    den Fliesstext in paragraph.runs durchsucht.
+
+    Rueckgabe:
+        {
+          "gefunden": bool,
+          "anzahl_bilder": int,
+          "anzahl_objekte": int,
+          "dateien": ["word/media/image1.png", ...],
+        }
+    """
+    bilder: list[str] = []
+    objekte: list[str] = []
+
+    with zipfile.ZipFile(input_path) as zf:
+        for name in zf.namelist():
+            if name.startswith("word/media/"):
+                suffix = Path(name).suffix.lower()
+                if suffix in BILDDATEI_ENDUNGEN:
+                    bilder.append(name)
+                else:
+                    # Unbekannte Endung unter media/ ist ebenfalls eine
+                    # eingebettete Grafik, nur nicht in unserer Liste.
+                    bilder.append(name)
+            elif name.startswith("word/embeddings/"):
+                objekte.append(name)
+
+    return {
+        "gefunden": bool(bilder or objekte),
+        "anzahl_bilder": len(bilder),
+        "anzahl_objekte": len(objekte),
+        "dateien": sorted(bilder + objekte),
+    }
+
+
 def insert_marker(doc, alias: str, version: int) -> None:
     """Fuegt die Kennzeichnungszeile als ersten Absatz ein."""
     marker_text = (
@@ -409,6 +475,20 @@ def main() -> int:
 
     suchliste = build_search_list(changemap)
 
+    medienbefund = detect_embedded_media(args.input)
+    if medienbefund["gefunden"]:
+        sys.stderr.write(
+            "WARNUNG: Das Originaldokument enthaelt eingebettete Grafiken "
+            f"oder Objekte ({medienbefund['anzahl_bilder']} Bild(er), "
+            f"{medienbefund['anzahl_objekte']} Objekt(e)). Text INNERHALB "
+            "dieser Grafiken (z. B. Screenshots, gescannte Unterschriften, "
+            "eingebettete Tabellenbilder) wird von der Codierung NICHT "
+            "erfasst. Vor Weitergabe des PSEUDO-Dokuments jede eingebettete "
+            "Grafik manuell auf Klarnamen pruefen. Siehe "
+            "references/roundtrip-grenzen.md, Abschnitt 'Eingebettete "
+            "Grafiken'.\n"
+        )
+
     doc = Document(str(args.input))
     _cursor, vorkommen_by_code = replace_in_document(doc, suchliste)
     insert_marker(doc, args.alias, args.legende_iteration)
@@ -428,7 +508,7 @@ def main() -> int:
         e["code"]: len(e["vorkommen"]) for e in legende["eintraege"]
     }
     report = {
-        "skill_version": "1.1",
+        "skill_version": "1.2",
         "legendenschema": LEGEND_SCHEMA_VERSION,
         "eingabe": str(args.input),
         "ausgabe_pseudo": str(pseudo_path),
@@ -438,8 +518,15 @@ def main() -> int:
         "legende_iteration": args.legende_iteration,
         "ersetzungen": ersetzungen,
         "codes_ohne_treffer": codes_ohne_treffer,
+        "eingebettete_grafiken": medienbefund,
         "hinweis": "Die Legende NICHT in offene KI-Umgebungen laden.",
     }
+    if medienbefund["gefunden"]:
+        report["hinweis_grafiken"] = (
+            "Originaldokument enthaelt eingebettete Grafiken/Objekte. "
+            "Text darin ist NICHT codiert. Manuelle Pruefung erforderlich "
+            "vor Weitergabe des PSEUDO-Dokuments."
+        )
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0
 
