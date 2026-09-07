@@ -114,6 +114,47 @@ garantiert:
   Zusatz- oder Loeschtaetigkeit stattfindet. Wird bei Sichtpruefung
   geprueft.
 
+## Eingebettete Grafiken
+
+Neu ab Skill v1.2, gemeldetes Anwendungsfinding aus der Praxis: Enthaelt
+das Original-DOCX eine eingebettete Grafik (Foto, Screenshot, gescannte
+Unterschrift, eingebettetes Objekt wie eine Excel-Tabelle als OLE-Objekt),
+so wird Text **innerhalb** dieser Grafik von der Pseudonymisierung nicht
+erfasst. Das liegt am Funktionsprinzip des Skripts: `replace_in_document()`
+durchsucht ausschliesslich den Fliesstext in `paragraph.runs` (Absaetze,
+Tabellenzellen, Kopf- und Fusszeilen). Pixelinhalte oder eingebettete
+Objektdaten sind dafuer nicht zugaenglich; das Skript hat keine
+texterkennende (OCR-)Komponente.
+
+**Praktische Folge:** Ein Klarname, der nur als Bildbestandteil im
+Dokument steht (z. B. ein eingescannter Briefkopf, ein Screenshot einer
+E-Mail, eine Signatur als Bild), bleibt im PSEUDO-Dokument unveraendert
+sichtbar, auch wenn derselbe Name im Fliesstext korrekt codiert wurde.
+
+**Erkennung ab v1.2:** `pseudonymize.py` liest den DOCX-Zip-Container
+direkt (unabhaengig von `python-docx`) und prueft die Ordner
+`word/media/` (Bilder) und `word/embeddings/` (eingebettete Objekte).
+Wird mindestens eine Datei gefunden, gilt:
+
+- Konsolenausgabe (stderr) meldet eine Warnung mit Anzahl der Funde.
+- Der Pruefbericht (JSON, stdout) enthaelt das Feld
+  `eingebettete_grafiken` mit `gefunden`, `anzahl_bilder`,
+  `anzahl_objekte` und der Dateiliste, sowie bei Fund zusaetzlich
+  `hinweis_grafiken`.
+
+**Was die Erkennung nicht leistet:** Sie stellt nur fest, *dass*
+Grafiken vorhanden sind, nicht *was* darauf zu sehen ist. Ob eine
+gefundene Grafik tatsaechlich schutzbeduerftige Angaben zeigt, muss der
+Anwender durch Sichtpruefung der Grafik im Original und im
+PSEUDO-Dokument selbst feststellen. Eine automatische Schwaerzung oder
+OCR-gestuetzte Codierung von Grafikinhalten ist nicht Teil dieses Skills.
+
+**Empfehlung fuer den Anwender:** Bei Fund vor Weitergabe des
+PSEUDO-Dokuments jede gemeldete Grafik im Original oeffnen und pruefen,
+ob sie Klarnamen oder andere schutzbeduerftige Angaben enthaelt. Falls
+ja: Grafik vor der Pseudonymisierung aus dem Dokument entfernen oder
+manuell unkenntlich machen, dann erneut pseudonymisieren.
+
 ## Migration alter PSEUDO-Dokumente
 
 Ein PSEUDO-Dokument aus v1.0 laesst sich nicht rueckwirkend mit einer
