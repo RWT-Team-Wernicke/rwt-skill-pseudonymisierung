@@ -1,8 +1,8 @@
 # rwt-skill-pseudonymisierung
 
-Stand: Version 1.1 (2026-09-06)
+Stand: Version 1.2 (2026-09-06)
 
-Agent-Skill für die reversible Pseudonymisierung von Mandatsdokumenten (DOCX) in einer geschlossenen KI-Umgebung. Erzeugt ein PSEUDO-Dokument, das gefahrlos in offene KI-Umgebungen geladen werden darf, sowie eine getrennte Legende zur Rückumwandlung. Ab v1.1 mit Legendenschema v2 (Positionsindex): wortgleicher Roundtrip erreichbar (Kriterium K5a).
+Agent-Skill für die reversible Pseudonymisierung von Mandatsdokumenten (DOCX) in einer geschlossenen KI-Umgebung. Erzeugt ein PSEUDO-Dokument, das gefahrlos in offene KI-Umgebungen geladen werden darf, sowie eine getrennte Legende zur Rückumwandlung. Ab v1.1 mit Legendenschema v2 (Positionsindex): wortgleicher Roundtrip erreichbar (Kriterium K5a). Ab v1.2 erkennt der Skill eingebettete Grafiken und Objekte im DOCX und weist darauf hin, dass Text darin nicht codiert wird.
 
 Interner Skill der RWT-Gruppe / Die TaxMaxen. Zielumgebung: Claract (OMM Solutions, Stuttgart) oder eine andere Umgebung mit Unterstützung für [Open Agent Skills](https://github.com/agentskills/agentskills).
 
@@ -15,6 +15,7 @@ Interner Skill der RWT-Gruppe / Die TaxMaxen. Zielumgebung: Claract (OMM Solutio
 - 13 Kategorien, Codeformat `[KATEGORIE_NN]`, buchstabengetreue Ersetzung
 - Legende in Markdown und JSON, JSON ist maschinenlesbar authoritativ
 - Rundlauf-getestet gegen ein fiktives Sachverhaltsschreiben (siehe `assets/`)
+- Erkennung eingebetteter Grafiken/Objekte im DOCX mit Warnhinweis (v1.2), da Text darin nicht codiert werden kann (siehe `references/roundtrip-grenzen.md`)
 
 ## Repositoriumsaufbau
 

@@ -1,6 +1,6 @@
 ---
 name: pseudonymisierung-mandatsdokumente
-version: 1.1
+version: 1.2
 description: |
   Reversible Pseudonymisierung von Kanzleidokumenten im DOCX-Format
   für die Weiterverarbeitung in offenen KI-Umgebungen. Erkennt Personen,
@@ -9,11 +9,13 @@ description: |
   PSEUDONYMISIEREN, FORTSCHREIBEN, RUECKUMWANDELN, PRUEFEN. Zweiphasig mit
   ausdrücklicher Freigabe, deterministische Ersetzung per Skript,
   strikte Legendentrennung. Beträge, Fristen, Rechtsnormen und Fundstellen
-  bleiben unverändert. Trigger: pseudonymisieren, anonymisieren, unkenntlich
-  machen, Mandantendaten schützen, Dokument für Perplexity vorbereiten,
-  Legende erstellen, rückumwandeln, Klarnamen zurückführen. Eingang und
-  Ausgang sind DOCX. Andere Formate zuerst mit dem Skill
-  rwt-skill-dokument-nach-docx in DOCX überführen.
+  bleiben unverändert. Erkennt eingebettete Grafiken und Objekte im DOCX
+  und weist darauf hin, dass Text darin nicht codiert wird. Trigger:
+  pseudonymisieren, anonymisieren, unkenntlich machen, Mandantendaten
+  schützen, Dokument für Perplexity vorbereiten, Legende erstellen,
+  rückumwandeln, Klarnamen zurückführen. Eingang und Ausgang sind DOCX.
+  Andere Formate zuerst mit dem Skill rwt-skill-dokument-nach-docx in
+  DOCX überführen.
 ---
 
 # Pseudonymisierungs-Skill für Mandatsdokumente
@@ -65,10 +67,11 @@ Nach `FREIGABE` (mit oder ohne Korrekturhinweisen des Anwenders):
 1. Erzeugen Sie eine Änderungskarte als JSON: `{"MANDAT-XY": [{"code": "PERSON_01", "kategorie": "PERSON", "grundform": "Dr. Klaus Vogel", "varianten": ["Herr Dr. Vogel", "Vogels", "K. Vogel"], "kommentar": "..."}, ...]}`. Nutzen Sie die exakte Grundform und alle Varianten aus der Vorschlagsliste, ergänzt um vom Anwender bestätigte Korrekturen.
 2. Rufen Sie `scripts/pseudonymize.py` mit dem hochgeladenen DOCX und der Änderungskarte auf. Das Skript erzeugt drei Dateien: `<Name>_PSEUDO.docx`, `<Alias>_LEGENDE_v1.md` und `<Alias>_LEGENDE_v1.json`.
 3. Rufen Sie `scripts/check_residuals.py` gegen die PSEUDO-Datei auf. Fassen Sie das Ergebnis im Prüfbericht als „Restsuche" zusammen. Klarnamen dort sind Fehler, die vor Auslieferung korrigiert werden müssen.
-4. Geben Sie im Chat aus:
+4. Prüfen Sie im Pruefbericht von `pseudonymize.py` das Feld `eingebettete_grafiken`. Steht dort `"gefunden": true`, weist das Original eingebettete Bilder oder Objekte auf (z. B. Screenshot, gescannte Unterschrift, eingebettetes Objekt). Text innerhalb dieser Grafiken wird nicht codiert. Geben Sie diesen Hinweis **ausdrücklich und in der Zielumgebung sichtbar** aus, nicht nur im Bericht, damit Anwender in Claract/Askdata die Grafik vor Weitergabe manuell prüfen.
+5. Geben Sie im Chat aus:
    - die drei Dateien zum Download
-   - einen kurzen **Prüfbericht** in Markdown mit: Anzahl ersetzter Vorkommen je Code, Ergebnis der Restsuche, gekennzeichnete Konfiguration, ausdrücklicher Hinweis „Legende getrennt aufbewahren, nicht in offene Umgebungen laden".
-5. Ergänzen Sie am Anfang der PSEUDO-Datei die Zeile: `[Pseudonymisiertes Dokument · Alias <ALIAS> · Legende v<N> · Codes nicht auflösen]`.
+   - einen kurzen **Prüfbericht** in Markdown mit: Anzahl ersetzter Vorkommen je Code, Ergebnis der Restsuche, gekennzeichnete Konfiguration, ausdrücklicher Hinweis „Legende getrennt aufbewahren, nicht in offene Umgebungen laden", und bei Fund von eingebetteten Grafiken einen eigenen Warnabsatz „Eingebettete Grafik erkannt: Text darin ist nicht pseudonymisiert, manuell prüfen".
+6. Ergänzen Sie am Anfang der PSEUDO-Datei die Zeile: `[Pseudonymisiertes Dokument · Alias <ALIAS> · Legende v<N> · Codes nicht auflösen]`.
 
 ## Ablauf FORTSCHREIBEN
 
@@ -122,6 +125,7 @@ PRUEFEN
 7. **Rechtsformzusätze stehen hinter dem Code.** `[FIRMA_02] GmbH & Co. KG`, nicht `[FIRMA_02]`.
 8. **Anhangsdateinamen werden mitcodiert.** Namensbestandteile in Dateinamen sind Identifikatoren.
 9. **Dokumente können nur als DOCX verarbeitet werden.** PDF, PPTX, XLSX und andere Formate bitte zuerst mit `rwt-skill-dokument-nach-docx` in DOCX überführen.
+10. **Eingebettete Grafiken werden nicht codiert.** Meldet der Pruefbericht `eingebettete_grafiken.gefunden = true`, geben Sie in jedem Fall einen sichtbaren Warnhinweis an den Anwender aus. Siehe `references/roundtrip-grenzen.md`, Abschnitt „Eingebettete Grafiken".
 
 ## Codeformat
 
@@ -157,7 +161,7 @@ Vor Auslieferung eines PSEUDO-Dokuments prüfen:
 - `references/legendenschema.md` — Aufbau der Legende (Kopf, Markdown-Tabelle, JSON-Block)
 - `references/regex-muster.md` — die harten Muster, die `check_residuals.py` nutzt
 - `references/bedienanleitung.md` — Schrittfolge für Anwender, Fehlerbilder, Ausschluss
-- `references/roundtrip-grenzen.md` — Herleitung des Positionsindex und Grenzen des wortgleichen Roundtrips (v1.1)
+- `references/roundtrip-grenzen.md` — Herleitung des Positionsindex und Grenzen des wortgleichen Roundtrips (v1.1), Grenzen bei eingebetteten Grafiken (v1.2)
 - `assets/Testdokument_A_Sachverhaltsschreiben.docx` — fiktives Kanzleischreiben mit 31 Entitäten, 7 Fallen; für Testläufe
 - `assets/loesungsschluessel_A.md` — Soll-Liste zum Vergleich; **nie in den Bot laden**, nur beim Tester
 - `assets/bewertungsbogen.md` — Kriterien K1 bis K10 mit K.o.-Regeln
@@ -165,5 +169,7 @@ Vor Auslieferung eines PSEUDO-Dokuments prüfen:
 ## Grenzen
 
 Der Skill trennt Erkennen und Ersetzen. Das Ersetzen ist deterministisch und in der Ausgabe garantiert vollständig, wenn die Änderungskarte vollständig ist. Die Vollständigkeit der Änderungskarte hängt von der Erkennung durch das Sprachmodell und vom Regex-Vorfilter ab. Beides ist gut, aber nicht perfekt. Die Freigabephase, die Restsuche und der zweite PRUEFEN-Lauf sind Bestandteil des Verfahrens, kein Zusatz. Für gescannte PDFs oder Bilder ohne Textebene ist der Skill nicht zuständig; nutzen Sie `rwt-skill-dokument-nach-docx` mit OCR-Vorlauf.
+
+**Eingebettete Grafiken im DOCX.** Enthält das Original eine eingebettete Grafik oder ein eingebettetes Objekt (Foto, Screenshot, gescannte Unterschrift, OLE-Objekt), erkennt `pseudonymize.py` dies ab Version 1.2 über den DOCX-Zip-Container und meldet es im Prüfbericht (`eingebettete_grafiken`). Text **innerhalb** der Grafik wird dabei nicht codiert, weil der Skill nur Fließtext durchsucht, keine Texterkennung (OCR) auf Bildinhalten durchführt. Bei Fund ist ein sichtbarer Warnhinweis an den Anwender in der Zielumgebung (Claract/Askdata) verbindlich. Siehe `references/roundtrip-grenzen.md`, Abschnitt „Eingebettete Grafiken".
 
 Keine Rechts-, Steuer- oder Datenschutzberatung. Vor produktivem Einsatz mit der RWT-KI-Richtlinie und dem Datenschutzbeauftragten abstimmen.
